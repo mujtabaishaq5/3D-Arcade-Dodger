@@ -1,5 +1,6 @@
-# Force GitHub to classify your extension as your custom language name
-*.elpl linguist-language=ELPL
+# Map your extension to an established language for syntax highlighting
+*.elpl linguist-language=Rust
 
-# Alternatively, you can explicitly hide specific folders from the language statistics bar completely:
-src/build_helpers/* linguist-vendored=true
+# Ignore CMake files from the language statistics bar completely
+CMakeLists.txt linguist-vendored=true
+*.cmake linguist-vendored=true
