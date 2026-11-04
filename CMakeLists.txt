@@ -24,7 +24,7 @@ include_directories(
 
 # 1. Define ELPL Compiler properties
 set(ELPL_JAR_PATH "/Users/apple/Projects/ELPL 2/elpl-compiler.jar")
-set(ELPL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/TunnelGame.elpl")
+set(ELPL_SOURCE "src/TunnelGame.elpl")
 set(ELPL_OBJECT "${CMAKE_CURRENT_BINARY_DIR}/TunnelGame.o")
 
 # 2. Tell CMake how to build ELPL using your -c flag

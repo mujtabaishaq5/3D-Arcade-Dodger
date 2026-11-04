@@ -13,7 +13,8 @@
 *.dll
 *.class
 *.jar
-
+*.c
+*.asm
 # === Third-Party Dependencies ===
 /SDL3/
 
