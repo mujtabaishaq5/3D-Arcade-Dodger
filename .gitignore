@@ -16,12 +16,9 @@
 *.c
 *.asm
 # === Third-Party Dependencies ===
-/SDL3/
+/SDL3
 
 # === Assets (Binaries & Media) ===
-*.ttf
-*.png
-*.wav
 *.mp3
 *.ogg
 
