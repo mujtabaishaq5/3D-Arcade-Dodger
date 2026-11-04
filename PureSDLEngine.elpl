@@ -1,0 +1,92 @@
+use "SDL3/SDL.h"
+use "stdlib.h"
+use "coprocessor.asm"
+
+
+function main(Array<String> args): Int {
+    printnl "--- Starting Pure ELPL + Direct SDL3 Engine ---"
+
+    // 1. Initialize SDL Video Subsystem (SDL_INIT_VIDEO = 32 / 0x20)
+    let init_res: Int be SDL_Init(32)
+    if init_res is less than 0 then {
+        printnl "Failed to initialize SDL3 natively from ELPL!"
+        return 1
+    }
+
+    let width: Int be 7680
+    let height: Int be 4320
+    let total_pixels: Int be width multiply height
+    let num_bytes: Int be total_pixels multiply 3
+
+    // 2. Create Window & Renderer directly from ELPL
+    // SDL_WINDOW_RESIZABLE = 32
+    let window: Pointer be SDL_CreateWindow("Pure ELPL Native SDL3 Engine", width, height, 32)
+    let renderer: Pointer be SDL_CreateRenderer(window, null)
+
+    // Create Streaming Texture (SDL_PIXELFORMAT_RGB24 = 386926595, SDL_TEXTUREACCESS_STREAMING = 2)
+    let texture_format: Int be 386926595
+    let texture_access: Int be 2
+    let texture: Pointer be SDL_CreateTexture(renderer, texture_format, texture_access, width, height)
+
+    // 3. Allocate RAM Framebuffer
+    let framebuffer: Pointer be malloc(num_bytes)
+    
+    // Allocate 128 bytes buffer for SDL_Event struct polling
+    let event_buf: Pointer be malloc(128)
+
+    let frame_count: Int be 0
+    let running: Int be 1
+
+    printnl "Entering Direct ELPL 60 FPS Render Loop..."
+
+    // 4. Real-Time Render & Event Loop in ELPL
+    while running is equal to 1 {
+
+        // Render animated color gradient directly in RAM
+        let i: Int be 0
+        while i is less than total_pixels {
+            let offset: Int be i multiply 3
+            let pixel_ptr: Pointer be offsetPointer(framebuffer, offset)
+
+            let x: Int be i mod width
+            let y: Int be i divide width
+
+            writeByte(pixel_ptr, (x add frame_count) mod 256)                      // Red
+            writeByte(offsetPointer(pixel_ptr, 1), (y add frame_count) mod 256)    // Green
+            writeByte(offsetPointer(pixel_ptr, 2), 128)                            // Blue
+
+            i pels 1
+        }
+
+        // Assembly Invert Coprocessor
+        invert_colors(framebuffer, num_bytes)
+
+        // Upload RAM buffer directly to GPU VRAM via SDL
+        let pitch: Int be width multiply 3
+        SDL_UpdateTexture(texture, null, framebuffer, pitch)
+        SDL_RenderClear(renderer)
+        SDL_RenderTexture(renderer, texture, null, null)
+        SDL_RenderPresent(renderer)
+
+        frame_count pels 1
+
+        // Poll Events directly into raw memory buffer
+        while SDL_PollEvent(event_buf) is equal to 1 {
+            // Read event type (first 4 bytes / Uint32 of SDL_Event)
+            let event_type: Int be readInt(event_buf)
+            
+            // SDL_EVENT_QUIT = 256 (0x100)
+            if event_type is equal to 256 then{
+                let running be 0
+            }
+        }
+    }
+
+    // 5. Cleanup directly in ELPL
+    free(event_buf)
+    free(framebuffer)
+    SDL_Quit()
+    
+    printnl "ELPL shut down SDL cleanly. Exiting."
+    return 0
+}

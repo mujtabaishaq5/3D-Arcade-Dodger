@@ -1,0 +1,582 @@
+use "SDL3/SDL.h"
+use "SDL3_ttf/SDL_ttf.h"
+use "OpenGL/gl.h"
+use "stdlib.h"
+use "SDL3_mixer/SDL_mixer.h"
+use "SDL3_image/SDL_image.h"
+
+// ========================================================
+// 🕹️ RETRO VECTOR UI ENGINE (Orthographic 800x600 Space)
+// ========================================================
+
+function draw_digit(Int d, Float x, Float y, Float w, Float h) {
+    let half_h: Float be h divide 2.0f
+    let z: Float be 0.0f
+
+    glBegin(1) // GL_LINES
+
+    // Top horizontal
+    if d not equal to 1 and d not equal to 4 then {
+        glVertex3f(x, y add h, z)
+        glVertex3f(x add w, y add h, z)
+    }
+    // Middle horizontal
+    if d not equal to 0 and d not equal to 1 and d not equal to 7 then {
+        glVertex3f(x, y add half_h, z)
+        glVertex3f(x add w, y add half_h, z)
+    }
+    // Bottom horizontal
+    if d not equal to 1 and d not equal to 4 and d not equal to 7 then {
+        glVertex3f(x, y, z)
+        glVertex3f(x add w, y, z)
+    }
+    // Top Left vertical
+    if d not equal to 1 and d not equal to 2 and d not equal to 3 and d not equal to 7 then {
+        glVertex3f(x, y add half_h, z)
+        glVertex3f(x, y add h, z)
+    }
+    // Bottom Left vertical
+    if d is equal to 0 or d is equal to 2 or d is equal to 6 or d is equal to 8 then {
+        glVertex3f(x, y, z)
+        glVertex3f(x, y add half_h, z)
+    }
+    // Top Right vertical
+    if d not equal to 5 and d not equal to 6 then {
+        glVertex3f(x add w, y add half_h, z)
+        glVertex3f(x add w, y add h, z)
+    }
+    // Bottom Right vertical
+    if d not equal to 2 then {
+        glVertex3f(x add w, y, z)
+        glVertex3f(x add w, y add half_h, z)
+    }
+    glEnd()
+}
+
+function draw_text(Pointer font, Pointer text, Float x, Float y) {
+    let length_arg: Int be 0
+    let surface: Pointer be TTF_RenderText_Blended(font, text, length_arg, -1)
+
+    if surface not equal to 0 then {
+        let w: Int be readInt(offsetPointer(surface, 8))
+        let h: Int be readInt(offsetPointer(surface, 12))
+        let pitch: Int be readInt(offsetPointer(surface, 16)) // 🚀 Read surface pitch!
+        let pixels: Pointer be readPointer(offsetPointer(surface, 24))
+
+        let tex_ptr: Pointer be malloc(4)
+        glGenTextures(1, tex_ptr)
+        let tex_id: Int be readInt(tex_ptr)
+
+        glEnable(3553) // GL_TEXTURE_2D
+        glBindTexture(3553, tex_id)
+
+        glPixelStorei(3317, 1) // GL_UNPACK_ALIGNMENT = 1
+
+        // 🚀 Tell OpenGL the exact row stride so it ignores surface padding!
+        glPixelStorei(3314, pitch divide 4) // GL_UNPACK_ROW_LENGTH
+
+        glEnable(3042) // GL_BLEND
+        glBlendFunc(770, 771) // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+
+        glTexParameteri(3553, 10241, 9728) // GL_TEXTURE_MIN_FILTER
+        glTexParameteri(3553, 10240, 9728) // GL_TEXTURE_MAG_FILTER
+
+        glTexImage2D(3553, 0, 6408, w, h, 0, 6408, 5121, pixels)
+
+        glColor3f(1.0f, 1.0f, 1.0f)
+
+      // 5. Draw a 2D Quad with corrected vertical texture coordinates
+              glBegin(7) // GL_QUADS
+              // Bottom-left of screen maps to bottom-left of image (t = 1.0f)
+              glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, 0.0f)
+
+              // Bottom-right of screen maps to bottom-right of image (t = 1.0f)
+              glTexCoord2f(1.0f, 1.0f); glVertex3f(x add (Float)w, y, 0.0f)
+
+              // Top-right of screen maps to top-right of image (t = 0.0f)
+              glTexCoord2f(1.0f, 0.0f); glVertex3f(x add (Float)w, y add (Float)h, 0.0f)
+
+              // Top-left of screen maps to top-left of image (t = 0.0f)
+              glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y add (Float)h, 0.0f)
+              glEnd()
+
+        // Reset pixel store states
+        glPixelStorei(3314, 0)
+        glPixelStorei(3317, 4)
+        glDisable(3042)
+        glDeleteTextures(1, tex_ptr)
+        SDL_DestroySurface(surface)
+        free(tex_ptr)
+        glDisable(3553)
+    }
+}
+
+function draw_score(Int score) {
+    let x1: Float be 330.0f
+    let y: Float be 510.0f
+    let w: Float be 30.0f
+    let h: Float be 50.0f
+    let spacing: Float be 45.0f
+
+    glColor3f((Float)1.0f, (Float)1.0f, (Float)0.0f)
+    glLineWidth(4.0f)
+
+    let hundreds: Int be score divide 100
+    let remainder: Int be score mod 100
+    let tens: Int be remainder divide 10
+    let ones: Int be remainder mod 10
+
+    // 🚀 PRE-CALCULATE TO AVOID INLINE MATH BUGS IN ARGUMENTS
+    let x2: Float be x1 add spacing
+    let x3: Float be x2 add spacing
+
+    // Draw digits using clean, pre-calculated variables
+    draw_digit(hundreds, x1, y, w, h)
+    draw_digit(tens, x2, y, w, h)
+    draw_digit(ones, x3, y, w, h)
+
+    return 0
+}
+
+function draw_game_over_ui(Pointer font) {
+    let z: Float be 0.0f
+
+    // 1. Bright Red Crash Box Outer Border
+    glColor3f(1.0f, 0.0f, 0.0f)
+    glLineWidth(5.0f)
+    glBegin(2) // GL_LINE_LOOP
+    glVertex3f(150.0f, 100.0f, z)
+    glVertex3f(650.0f, 100.0f, z)
+    glVertex3f(650.0f, 500.0f, z)
+    glVertex3f(150.0f, 500.0f, z)
+    glEnd()
+
+    // 2. Render actual TTF text instead of vectors!
+    draw_text(font, "GAME OVER", 200.0f, 290.0f)
+    draw_text(font, "PRESS SPACE", 200.0f, 230.0f)
+}
+
+// ========================================================
+// 🎮 RETRO 3D ARCADE ENGINE: SPACE TUNNEL DODGER
+// ========================================================
+
+function draw_tunnel(Float offset) {
+    let i: Float be 0.0f
+    while i is less than 40.0f {
+        let z_pos: Float be (0.0f subtract i) add offset
+
+        glBegin(2) // GL_LINE_LOOP
+        glColor3f(0.0f, 1.0f, 1.0f)
+        glVertex3f(0.0f subtract 2.5f, 0.0f subtract 1.0f, z_pos)
+        glVertex3f(2.5f, 0.0f subtract 1.0f, z_pos)
+        glVertex3f(2.5f, 2.0f, z_pos)
+        glVertex3f(0.0f subtract 2.5f, 2.0f, z_pos)
+        glEnd()
+        i be i add 4.0f
+    }
+
+    glBegin(1) // GL_LINES
+    glColor3f(0.0f, 0.6f, 0.6f)
+    glVertex3f(0.0f subtract 2.5f, 0.0f subtract 1.0f, offset)
+    glVertex3f(0.0f subtract 2.5f, 0.0f subtract 1.0f, (0.0f subtract 40.0f) add offset)
+    glVertex3f(2.5f, 0.0f subtract 1.0f, offset)
+    glVertex3f(2.5f, 0.0f subtract 1.0f, (0.0f subtract 40.0f) add offset)
+    glVertex3f(0.0f subtract 2.5f, 2.0f, offset)
+    glVertex3f(0.0f subtract 2.5f, 2.0f, (0.0f subtract 40.0f) add offset)
+    glVertex3f(2.5f, 2.0f, offset)
+    glVertex3f(2.5f, 2.0f, (0.0f subtract 40.0f) add offset)
+    glEnd()
+}
+
+
+function draw_cube(Float x, Float y, Float z, Float size, Float r, Float g, Float b) {
+    let half: Float be size divide 2.0f
+    glLoadIdentity()
+    glTranslatef(x, y, z)
+
+    glBegin(7) // GL_QUADS
+    glColor3f(r, g, b)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, half)
+    glVertex3f(half, 0.0f subtract half, half)
+    glVertex3f(half, half, half)
+    glVertex3f(0.0f subtract half, half, half)
+    glVertex3f(half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, half, 0.0f subtract half)
+    glVertex3f(half, half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, half, half)
+    glVertex3f(half, half, half)
+    glVertex3f(half, half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(half, 0.0f subtract half, half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, half)
+    glVertex3f(0.0f subtract half, half, half)
+    glVertex3f(0.0f subtract half, half, 0.0f subtract half)
+    glVertex3f(half, 0.0f subtract half, half)
+    glVertex3f(half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(half, half, 0.0f subtract half)
+    glVertex3f(half, half, half)
+    glEnd()
+
+    glColor3f(0.0f, 0.0f, 0.0f)
+    glBegin(2) // GL_LINE_LOOP
+    glVertex3f(0.0f subtract half, 0.0f subtract half, half)
+    glVertex3f(half, 0.0f subtract half, half)
+    glVertex3f(half, half, half)
+    glVertex3f(0.0f subtract half, half, half)
+    glEnd()
+    glBegin(2)
+    glVertex3f(half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, 0.0f subtract half, 0.0f subtract half)
+    glVertex3f(0.0f subtract half, half, 0.0f subtract half)
+    glVertex3f(half, half, 0.0f subtract half)
+    glEnd()
+}
+
+function main(Array<String> args): Int {
+
+let game_over: Int be 0
+    let game_started: Int be 0 // 🚀 Add this!
+    let score: Int be 0
+// Initialize TTF Engine
+    let ttf_init: Int be TTF_Init()
+    if ttf_init is less than 0 then {
+        puts(SDL_GetError())
+        return 1
+    }
+
+    let size: Float be 48
+
+ // 🚀 FIX: Use a Float literal (36.0f) so the C ABI aligns the hardware registers correctly!
+     let font: Pointer be TTF_OpenFont("/Users/apple/CLionProjects/PolyglotDemo/CardotSemibold-1jzKM.ttf", size)
+       if font is equal to 0 then {
+           printnl 404
+           puts(SDL_GetError()) // Print the exact reason it failed!
+           return 1 // 🚀 FIX: Abort instantly to prevent the SIGSEGV!
+       }
+
+    let init_res: Int be SDL_Init(48)
+    if init_res is less than 0 then { return 1 }
+
+    SDL_GL_SetAttribute(6, 24)
+    SDL_GL_SetAttribute(5, 1)
+
+    let width: Int be 800
+    let height: Int be 600
+
+    let window: Pointer be SDL_CreateWindow("3D Arcade Dodger", width, height, 2)
+    let gl_context: Pointer be SDL_GL_CreateContext(window)
+
+    glEnable(2929)
+    glDepthFunc(515)
+
+     MIX_Init(0)
+
+   // 🚀 FIX: Pass -1 instead of 0 to get the Default macOS Audio Output
+       let default_device: Int be -1
+       let game_mixer: Pointer be MIX_CreateMixerDevice(default_device, 0)
+
+       if game_mixer is equal to 0 then {
+           printnl 500 // Still failing to open speakers
+       }
+
+       let crash_audio: Pointer be MIX_LoadAudio("crash.wav")
+       let pass_audio: Pointer be MIX_LoadAudio("ting.wav");
+
+
+       if crash_audio is equal to 0 then {
+           printnl 404 // Audio device worked, but the file doesn't exist!
+           // 🚀 Fetch the exact C-string error from SDL and print it!
+                   puts((Pointer)SDL_GetError())
+       }
+
+       let crash_track: Pointer be MIX_CreateTrack(game_mixer)
+       let pass_track: Pointer be MIX_CreateTrack(game_mixer)
+       MIX_SetTrackAudio(crash_track, crash_audio)
+       MIX_SetTrackAudio(pass_track, pass_audio)
+
+   // Load image into an SDL surface
+   let title_surface: Pointer be IMG_Load("start.png")
+   let title_tex_ptr: Pointer be malloc(4)
+   glGenTextures(1, title_tex_ptr)
+   let title_tex_id: Int be readInt(title_tex_ptr)
+
+   // Bind and upload to OpenGL
+   glBindTexture(3553, title_tex_id)
+   glTexParameteri(3553, 10241, 9728) // GL_TEXTURE_MIN_FILTER
+   glTexParameteri(3553, 10240, 9728) // GL_TEXTURE_MAG_FILTER
+
+   let t_w: Int be readInt(offsetPointer(title_surface, 8))
+   let t_h: Int be readInt(offsetPointer(title_surface, 12))
+   let t_pixels: Pointer be readPointer(offsetPointer(title_surface, 24))
+   glTexImage2D(3553, 0, 6408, t_w, t_h, 0, 6408, 5121, t_pixels)
+
+    // Initial 3D Setup
+    glMatrixMode(5889)
+    glLoadIdentity()
+    glFrustum(
+        (Double)(0.0 subtract 1.0),
+        (Double)1.0,
+        (Double)(0.0 subtract 0.75),
+        (Double)0.75,
+        (Double)1.0,
+        (Double)50.0
+    )
+    glMatrixMode(5888)
+
+    let event_buf: Pointer be malloc(128)
+    let running: Int be 1
+
+
+    let player_x: Float be 0.0f
+    let player_size: Float be 0.4f
+
+    // Obstacle 1 starts directly in center lane (0.0) to force a crash if unhandled!
+    let obs1_x: Float be 0.0f
+    let obs1_z: Float be 0.0f subtract 16.0f
+    let obs2_x: Float be 0.6f
+    let obs2_z: Float be 0.0f subtract 24.0f
+
+    let speed: Float be 0.22f
+    let tunnel_offset: Float be 0.0f
+
+while running is equal to 1 {
+          glClear(16640)
+
+        // 🚀 PROGRESSIVE DIFFICULTY RAMP BASED ON SCORE
+        if score is greater than 299 then {
+            speed be 0.40f // Very fast at 300+
+        } otherwise {
+            if score is greater than 199 then {
+                speed be 0.32f // 🚀 Significantly faster after 200!
+            } otherwise {
+                speed be 0.22f // Normal base speed
+            }
+        }
+
+        // 🚀 Check BOTH game_over AND game_started!
+        if game_over is equal to 0 and game_started is equal to 1 then {
+             // We need a way to know the game actually started.
+            tunnel_offset pels speed
+            if tunnel_offset is greater than 4.0f then {
+                tunnel_offset be tunnel_offset subtract 4.0f
+            }
+
+            obs1_z pels speed
+            obs2_z pels speed
+
+          // Respawn Obstacle 1
+                     if obs1_z is greater than 1.0f then {
+                         obs1_z be -20.0f
+                         score pels 1
+                         MIX_PlayTrack(pass_track, 0)
+
+                         // 🚀 5-LANE SPAWN LOGIC (Forces player off the edges)
+                         let lane1: Int be score mod 5
+                         if lane1 is equal to 0 then { obs1_x be 0.0f }
+                         if lane1 is equal to 1 then { obs1_x be 0.6f }
+                         if lane1 is equal to 2 then { obs1_x be -0.6f }
+                         if lane1 is equal to 3 then { obs1_x be 1.2f } // Far Right Edge!
+                         if lane1 is equal to 4 then { obs1_x be -1.2f } // Far Left Edge!
+                     }
+
+                 // Respawn Obstacle 2
+                            if obs2_z is greater than 1.0f then {
+                                obs2_z be 0.0f subtract 26.0f
+                                score pels 1
+                                MIX_PlayTrack(pass_track, 0)
+
+                                // 🚀 5-LANE SPAWN LOGIC (Offset math so it doesn't overlap obs1)
+                                let lane2: Int be (score add 2) mod 5
+                                if lane2 is equal to 0 then { obs2_x be -1.2f } // Far Left Edge!
+                                if lane2 is equal to 1 then { obs2_x be 1.2f } // Far Right Edge!
+                                if lane2 is equal to 2 then { obs2_x be -0.6f }
+                                if lane2 is equal to 3 then { obs2_x be 0.6f }
+                                if lane2 is equal to 4 then { obs2_x be 0.0f }
+                            }
+
+            // AABB Collision Detection against player at Z = -1.5
+            if obs1_z is greater than (-2.1f) then {
+                if obs1_z is less than (-0.9f) then {
+                    let dx1: Float be player_x subtract obs1_x
+                    if dx1 is less than 0.45f then {
+                        if dx1 is greater than (-0.45f) then {
+
+                      if game_over is equal to 0 then {
+                                                      MIX_PlayTrack(crash_track, 1)
+                                                  }
+                            game_over be 1
+                        }
+                    }
+                }
+            }
+            if obs2_z is greater than (0.0f subtract 2.1f) then {
+                if obs2_z is less than (0.0f subtract 0.9f) then {
+                    let dx2: Float be player_x subtract obs2_x
+                    if dx2 is less than 0.45f then {
+                        if dx2 is greater than (0.0f subtract 0.45f) then {
+                    // 🚀 PLAY SOUND EXACTLY ONCE
+                 if game_over is equal to 0 then {
+                                                 MIX_PlayTrack(crash_track, 0)
+                                             }
+                            game_over be 1
+                        }
+                    }
+                }
+            }
+        }
+
+        // ====================================================
+        // 3D RENDER PASS
+        // ====================================================
+        glLineWidth(1.0f)
+        glLoadIdentity()
+        draw_tunnel(tunnel_offset)
+
+        if game_over is equal to 0 then {
+            draw_cube(player_x, 0.0f subtract 0.3f, 0.0f subtract 1.5f, player_size, 0.2f, 0.9f, 0.3f)
+        } otherwise {
+            draw_cube(player_x, 0.0f subtract 0.3f, 0.0f subtract 1.5f, player_size, 1.0f, 0.4f, 0.0f)
+        }
+
+        draw_cube(obs1_x, 0.0f subtract 0.3f, obs1_z, 0.6f, 0.9f, 0.1f, 0.1f)
+        draw_cube(obs2_x, 0.0f subtract 0.3f, obs2_z, 0.6f, 0.9f, 0.1f, 0.1f)
+
+        // ====================================================
+        // 2D UI OVERLAY PASS (Explicit 64-bit glOrtho & Stack Push)
+        // ====================================================
+        glDisable(2929) // Disable depth buffer for UI
+
+        glMatrixMode(5889) // PROJECTION Matrix
+        glPushMatrix()
+        glLoadIdentity()
+
+        // 🔥 EXPLICIT DOUBLE CASTS ON glOrtho PREVENT ABI CORRUPTION
+        glOrtho(
+            (Double)0.0,
+            (Double)800.0,
+            (Double)0.0,
+            (Double)600.0,
+            (Double)(0.0 subtract 1.0),
+            (Double)1.0
+        )
+
+   glMatrixMode(5888) // MODELVIEW Matrix
+           glPushMatrix()
+           glLoadIdentity()
+
+           // Draw live score
+           draw_score(score)
+
+           // 🚀 FLASH ARCADE MILESTONES DURING GAMEPLAY
+           if game_started is equal to 1 then {
+               if game_over is equal to 0 then {
+
+                   // Flash "NICE SCORE!" between 100 and 115 points
+                   if score is greater than 99 then {
+                       if score is less than 116 then {
+                           glColor3f(0.0f, 1.0f, 0.0f) // Neon Green
+                           draw_text(font, "EXCELLENT SCORE!", 200.0f, 290.0f)
+                       }
+                   }
+
+                   // Flash "GREAT RUN!" between 200 and 215 points
+                   if score is greater than 199 then {
+                       if score is less than 216 then {
+                           glColor3f(1.0f, 0.5f, 0.0f) // Orange
+                           draw_text(font, "GREAT RUN!", 200.0f, 240.0f)
+                       }
+                   }
+               }
+           }
+
+       // 🚀 Only show the title screen if the game hasn't started!
+             if game_started is equal to 0 then {
+                  glEnable(3553)
+                  glBindTexture(3553, title_tex_id)
+                  glBegin(7) // GL_QUADS
+                  glTexCoord2f(0.0f, 1.0f); glVertex3f(0.0f, 0.0f, 0.0f)
+                  glTexCoord2f(1.0f, 1.0f); glVertex3f(800.0f, 0.0f, 0.0f)
+                  // 🚀 FIX: This must be 1.0f, 0.0f for the top-right corner!
+                  glTexCoord2f(1.0f, 0.0f); glVertex3f(800.0f, 600.0f, 0.0f)
+                  glTexCoord2f(0.0f, 0.0f); glVertex3f(0.0f, 600.0f, 0.0f)
+                  glEnd()
+                  glDisable(3553)
+              }
+
+        // Draw crash overlay on Game Over
+        if game_over is equal to 1 then {
+            draw_game_over_ui(font)
+        }
+
+        // Restore 3D Matrices
+        glMatrixMode(5889)
+        glPopMatrix()
+        glMatrixMode(5888)
+        glPopMatrix()
+
+        glEnable(2929) // Re-enable depth buffer
+
+        // ====================================================
+
+        SDL_GL_SwapWindow(window)
+        SDL_Delay(16)
+
+        // ====================================================
+        // INPUT POLLING
+        // ====================================================
+        while SDL_PollEvent(event_buf) is equal to 1 {
+            let event_type: Int be readInt(event_buf)
+
+            if event_type is equal to 256 then { running be 0 }
+
+            if event_type is equal to 768 then {
+                let key_code: Int be readInt(offsetPointer(event_buf, 28))
+
+                // Left Dodge
+                if key_code is equal to 97 or key_code is equal to 1073741904 then {
+                    if player_x is greater than (0.0f subtract 1.2f) then {
+                        player_x be player_x subtract 0.2f
+                    }
+                }
+                // Right Dodge
+                if key_code is equal to 100 or key_code is equal to 1073741903 then {
+                    if player_x is less than 1.2f then {
+                        player_x be player_x add 0.2f
+                    }
+                }
+                // Spacebar Restart
+                if key_code is equal to 32 then {
+                if game_started is equal to 0 then {
+                game_started be 1 // start the game
+                }
+                    otherwise if game_over is equal to 1 then {
+                        game_over be 0
+                        score be 0
+                        player_x be 0.0f
+                        tunnel_offset be 0.0f
+                        obs1_x be 0.0f
+                        obs1_z be 0.0f subtract 16.0f
+                        obs2_x be 0.6f
+                        obs2_z be 0.0f subtract 24.0f
+                    }
+                }
+            }
+        }
+    }
+
+  // CORRECT CLEANUP ORDER:
+      free(event_buf)
+
+      glDeleteTextures(1, title_tex_ptr)
+      SDL_DestroySurface(title_surface)
+      free(title_tex_ptr)
+
+      SDL_GL_DestroyContext(gl_context) // Context must be destroyed LAST
+      SDL_Quit()
+      return 0
+}

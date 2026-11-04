@@ -1,0 +1,157 @@
+use "SDL3/SDL.h"
+use "OpenGL/gl.h"
+use "stdlib.h"
+
+// ========================================================
+// 🚀 MAIN ENTRY POINT (EXACT 3D CUBE WITH EDGE OUTLINES)
+// ========================================================
+function main(Array<String> args): Int {
+    printnl "--- Starting ELPL OpenGL Engine (3D Solid Cube) ---"
+
+    let init_res: Int be SDL_Init(32)
+    if init_res is less than 0 then {
+        printnl "Failed to initialize SDL3!"
+        return 1
+    }
+
+    // Configure 24-bit Depth Buffer and Double Buffering
+    SDL_GL_SetAttribute(6, 24)
+    SDL_GL_SetAttribute(5, 1)
+
+    let width: Int be 512
+    let height: Int be 512
+
+    let window: Pointer be SDL_CreateWindow("ELPL Exact 3D Solid Cube", width, height, 2)
+    let gl_context: Pointer be SDL_GL_CreateContext(window)
+
+    // Enable Hardware Depth Testing
+    glEnable(2929)
+    glDepthFunc(515)
+
+    let running: Int be 1
+    let event_buf: Pointer be malloc(128)
+    let rot_angle: Float be 0.0
+
+    printnl "OpenGL Initialized! Rendering 3D Solid Cube with Edge Outlines."
+
+    while running is equal to 1 {
+
+        // 1. Clear GPU Color & Depth Buffers
+        glClear(16640)
+
+        // 2. Setup 3D View Transformation
+        glLoadIdentity()
+
+        // Tilt down 20 degrees on X so top face is visible
+        glRotatef(20.0, 1.0, 0.0, 0.0)
+
+        // Spin horizontally around vertical Y axis (Left-to-Right)
+        glRotatef(rot_angle, 0.0, 1.0, 0.0)
+
+        // ====================================================
+        // PASS 1: RENDER 6 SOLID COLORED FACES (Size: 0.8 x 0.8 x 0.8)
+        // ====================================================
+        glBegin(7) // GL_QUADS = 7
+
+        // Front Face (Red)
+        glColor3f(0.9, 0.2, 0.2)
+        glVertex3f(-0.4, -0.4,  0.4)
+        glVertex3f( 0.4, -0.4,  0.4)
+        glVertex3f( 0.4,  0.4,  0.4)
+        glVertex3f(-0.4,  0.4,  0.4)
+
+        // Back Face (Green)
+        glColor3f(0.2, 0.8, 0.2)
+        glVertex3f( 0.4, -0.4, -0.4)
+        glVertex3f(-0.4, -0.4, -0.4)
+        glVertex3f(-0.4,  0.4, -0.4)
+        glVertex3f( 0.4,  0.4, -0.4)
+
+        // Top Face (Blue)
+        glColor3f(0.2, 0.4, 0.9)
+        glVertex3f(-0.4,  0.4,  0.4)
+        glVertex3f( 0.4,  0.4,  0.4)
+        glVertex3f( 0.4,  0.4, -0.4)
+        glVertex3f(-0.4,  0.4, -0.4)
+
+        // Bottom Face (Yellow)
+        glColor3f(0.9, 0.8, 0.2)
+        glVertex3f(-0.4, -0.4, -0.4)
+        glVertex3f( 0.4, -0.4, -0.4)
+        glVertex3f( 0.4, -0.4,  0.4)
+        glVertex3f(-0.4, -0.4,  0.4)
+
+        // Right Face (Cyan)
+        glColor3f(0.2, 0.8, 0.8)
+        glVertex3f( 0.4, -0.4,  0.4)
+        glVertex3f( 0.4, -0.4, -0.4)
+        glVertex3f( 0.4,  0.4, -0.4)
+        glVertex3f( 0.4,  0.4,  0.4)
+
+        // Left Face (Magenta)
+        glColor3f(0.8, 0.2, 0.8)
+        glVertex3f(-0.4, -0.4, -0.4)
+        glVertex3f(-0.4, -0.4,  0.4)
+        glVertex3f(-0.4,  0.4,  0.4)
+        glVertex3f(-0.4,  0.4, -0.4)
+
+        glEnd()
+
+        // ====================================================
+        // PASS 2: RENDER BLACK WIREFRAME OUTLINES (All 12 Edges)
+        // ====================================================
+        glColor3f(0.0, 0.0, 0.0) // Pure Black
+
+        // Front Face Outline
+        glBegin(2) // GL_LINE_LOOP = 2
+        glVertex3f(-0.4, -0.4,  0.4)
+        glVertex3f( 0.4, -0.4,  0.4)
+        glVertex3f( 0.4,  0.4,  0.4)
+        glVertex3f(-0.4,  0.4,  0.4)
+        glEnd()
+
+        // Back Face Outline
+        glBegin(2)
+        glVertex3f( 0.4, -0.4, -0.4)
+        glVertex3f(-0.4, -0.4, -0.4)
+        glVertex3f(-0.4,  0.4, -0.4)
+        glVertex3f( 0.4,  0.4, -0.4)
+        glEnd()
+
+        // Top Face Outline
+        glBegin(2)
+        glVertex3f(-0.4,  0.4,  0.4)
+        glVertex3f( 0.4,  0.4,  0.4)
+        glVertex3f( 0.4,  0.4, -0.4)
+        glVertex3f(-0.4,  0.4, -0.4)
+        glEnd()
+
+        // Bottom Face Outline
+        glBegin(2)
+        glVertex3f(-0.4, -0.4, -0.4)
+        glVertex3f( 0.4, -0.4, -0.4)
+        glVertex3f( 0.4, -0.4,  0.4)
+        glVertex3f(-0.4, -0.4,  0.4)
+        glEnd()
+
+        // 3. Swap Buffers & Frame Timing
+        SDL_GL_SwapWindow(window)
+        rot_angle be rot_angle add 1.2
+        SDL_Delay(16)
+
+        // 4. Poll Events
+        while SDL_PollEvent(event_buf) is equal to 1 {
+            let event_type: Int be readInt(event_buf)
+            if event_type is equal to 256 then {
+                running be 0
+            }
+        }
+    }
+
+    free(event_buf)
+    SDL_GL_DestroyContext(gl_context)
+    SDL_Quit()
+
+    printnl "OpenGL Engine shut down cleanly."
+    return 0
+}

@@ -1,0 +1,33 @@
+# === Build & Compiler Artifacts ===
+/cmake-build-debug/
+/cmake-build-release/
+/out/
+/build/
+.gradle/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.class
+*.jar
+
+# === Third-Party Dependencies ===
+/SDL3/
+
+# === Assets (Binaries & Media) ===
+*.ttf
+*.png
+*.wav
+*.mp3
+*.ogg
+
+# === IDE & System Files ===
+.idea/
+.vscode/
+*.suo
+*.user
+.DS_Store
+Thumbs.db

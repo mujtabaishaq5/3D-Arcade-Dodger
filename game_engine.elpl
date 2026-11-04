@@ -1,0 +1,263 @@
+use "SDL3/SDL.h"
+use "stdlib.h"
+use "math.h"
+use "coprocessor.asm"
+
+
+// ========================================================
+// 🛠️ HELPER GRAPHICS & MATH FUNCTIONS
+// ========================================================
+function elpl_abs(Int val): Int {
+    if val is less than 0 then {
+        return 0 subtract val
+    }
+    return val
+}
+
+function elpl_f2i(Float f): Int {
+    return (Int) f;
+}
+function draw_pixel(Pointer framebuffer, Int x, Int y, Int r, Int g, Int b, Int width, Int height) {
+    if x is greater than or equal to 0 then {
+        if x is less than width then {
+            if y is greater than or equal to 0 then {
+                if y is less than height then {
+                    let offset: Int be (y multiply width add x) multiply 3
+                    let pixel_ptr: Pointer be offsetPointer(framebuffer, offset)
+                    writeByte(pixel_ptr, r)
+                    writeByte(offsetPointer(pixel_ptr, 1), g)
+                    writeByte(offsetPointer(pixel_ptr, 2), b)
+                }
+            }
+        }
+    }
+}
+
+function draw_line(Pointer framebuffer, Int x1, Int y1, Int x2, Int y2, Int r, Int g, Int b, Int width, Int height) {
+    let dx: Int be elpl_abs(x2 subtract x1)
+    let dy: Int be elpl_abs(y2 subtract y1)
+
+    let sx: Int be 1
+    if x1 is greater than x2 then {
+        sx be 0 subtract 1
+    }
+
+    let sy: Int be 1
+    if y1 is greater than y2 then {
+        sy be 0 subtract 1
+    }
+
+    let err: Int be dx subtract dy
+    let curr_x: Int be x1
+    let curr_y: Int be y1
+    let drawing: Int be 1
+
+    while drawing is equal to 1 {
+        draw_pixel(framebuffer, curr_x, curr_y, r, g, b, width, height)
+
+        if curr_x is equal to x2 then {
+            if curr_y is equal to y2 then {
+                drawing be 0
+            }
+        }
+
+        if drawing is equal to 1 then {
+            let e2: Int be err multiply 2
+            if e2 is greater than (0 subtract dy) then {
+                err be err subtract dy
+                curr_x be curr_x add sx
+            }
+            if e2 is less than dx then {
+                err be err add dx
+                curr_y be curr_y add sy
+            }
+        }
+    }
+}
+
+function transform_and_project_x(Float x, Float y, Float z, Float s, Float c, Float tilt_s, Float tilt_c, Float cam_z): Int {
+    let x_rot: Float be (x multiply c) subtract (z multiply s)
+    let z_rot: Float be (z multiply c) add (x multiply s)
+    let z_final: Float be (z_rot multiply tilt_c) add (y multiply tilt_s) add cam_z
+    let fov: Float be 400.0
+    return elpl_f2i((x_rot divide z_final) multiply fov) add 256
+}
+
+function transform_and_project_y(Float x, Float y, Float z, Float s, Float c, Float tilt_s, Float tilt_c, Float cam_z): Int {
+    let x_rot: Float be (x multiply c) subtract (z multiply s)
+    let z_rot: Float be (z multiply c) add (x multiply s)
+    let y_rot: Float be (y multiply tilt_c) subtract (z_rot multiply tilt_s)
+    let z_final: Float be (z_rot multiply tilt_c) add (y multiply tilt_s) add cam_z
+    let fov: Float be 400.0
+    return elpl_f2i((y_rot divide z_final) multiply fov) add 256
+}
+
+// ========================================================
+// 🚀 MAIN ENTRY POINT
+// ========================================================
+function main(Array<String> args): Int {
+    printnl "--- Starting ELPL Interactive 3D Renderer ---"
+
+    let init_res: Int be SDL_Init(32)
+    if init_res is less than 0 then {
+        printnl "Failed to initialize SDL3!"
+        return 1
+    }
+
+    let width: Int be 512
+    let height: Int be 512
+    let total_pixels: Int be width multiply height
+    let num_bytes: Int be total_pixels multiply 3
+
+    let window: Pointer be SDL_CreateWindow("ELPL 3D Interactive Renderer", width, height, 32)
+    let renderer: Pointer be SDL_CreateRenderer(window, null)
+    SDL_SetRenderVSync(renderer, 0)
+
+    let texture_format: Int be 386926595
+    let texture_access: Int be 2
+    let texture: Pointer be SDL_CreateTexture(renderer, texture_format, texture_access, width, height)
+
+    let framebuffer: Pointer be malloc(num_bytes)
+    let event_buf: Pointer be malloc(128)
+
+    let running: Int be 1
+    let frame_count: Int be 0
+
+    // Dynamic State Variables
+    let rot_y: Float be 0.0
+    let tilt_angle: Float be 0.5
+    let cam_z: Float be 200.0
+    let auto_rotate: Int be 1
+
+    printnl "Rendering Interactive 3D Perspective Wireframe Cube."
+
+    while running is equal to 1 {
+
+        // 1. Clear Framebuffer to Dark Space Background
+        let i: Int be 0
+        while i is less than total_pixels {
+            let offset: Int be i multiply 3
+            let pixel_ptr: Pointer be offsetPointer(framebuffer, offset)
+
+            writeByte(pixel_ptr, 20)                      // Red
+            writeByte(offsetPointer(pixel_ptr, 1), 25)    // Green
+            writeByte(offsetPointer(pixel_ptr, 2), 45)    // Blue
+
+            i pels 1
+        }
+
+        // 2. Auto-Rotate Frame Step
+        if auto_rotate is equal to 1 then {
+            rot_y be rot_y add 0.015
+        }
+
+        let s: Float be sinf(rot_y)
+        let c: Float be cosf(rot_y)
+        let tilt_c: Float be cosf(tilt_angle)
+        let tilt_s: Float be sinf(tilt_angle)
+
+        // 3. Transform & Project 8 Cube Vertices (-50 to +50)
+        let x0: Int be transform_and_project_x(-50.0, -50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y0: Int be transform_and_project_y(-50.0, -50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x1: Int be transform_and_project_x( 50.0, -50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y1: Int be transform_and_project_y( 50.0, -50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x2: Int be transform_and_project_x( 50.0,  50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y2: Int be transform_and_project_y( 50.0,  50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x3: Int be transform_and_project_x(-50.0,  50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y3: Int be transform_and_project_y(-50.0,  50.0, -50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x4: Int be transform_and_project_x(-50.0, -50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y4: Int be transform_and_project_y(-50.0, -50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x5: Int be transform_and_project_x( 50.0, -50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y5: Int be transform_and_project_y( 50.0, -50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x6: Int be transform_and_project_x( 50.0,  50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y6: Int be transform_and_project_y( 50.0,  50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        let x7: Int be transform_and_project_x(-50.0,  50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+        let y7: Int be transform_and_project_y(-50.0,  50.0,  50.0, s, c, tilt_s, tilt_c, cam_z)
+
+        // 4. Render 12 Edges (Vivid Cyan Lines)
+        // Back Face
+        draw_line(framebuffer, x0, y0, x1, y1, 0, 255, 255, width, height)
+        draw_line(framebuffer, x1, y1, x2, y2, 0, 255, 255, width, height)
+        draw_line(framebuffer, x2, y2, x3, y3, 0, 255, 255, width, height)
+        draw_line(framebuffer, x3, y3, x0, y0, 0, 255, 255, width, height)
+
+        // Front Face
+        draw_line(framebuffer, x4, y4, x5, y5, 0, 255, 255, width, height)
+        draw_line(framebuffer, x5, y5, x6, y6, 0, 255, 255, width, height)
+        draw_line(framebuffer, x6, y6, x7, y7, 0, 255, 255, width, height)
+        draw_line(framebuffer, x7, y7, x4, y4, 0, 255, 255, width, height)
+
+        // Connecting Pillars
+        draw_line(framebuffer, x0, y0, x4, y4, 0, 255, 255, width, height)
+        draw_line(framebuffer, x1, y1, x5, y5, 0, 255, 255, width, height)
+        draw_line(framebuffer, x2, y2, x6, y6, 0, 255, 255, width, height)
+        draw_line(framebuffer, x3, y3, x7, y7, 0, 255, 255, width, height)
+
+        // 5. Upload RAM Framebuffer to GPU VRAM & Present
+        let pitch: Int be width multiply 3
+        SDL_UpdateTexture(texture, null, framebuffer, pitch)
+        SDL_RenderClear(renderer)
+        SDL_RenderTexture(renderer, texture, null, null)
+        SDL_RenderPresent(renderer)
+
+        frame_count pels 1
+        SDL_Delay(16) // Lock frame rate to ~60 FPS
+
+        // 6. Poll SDL Keyboard Events
+        while SDL_PollEvent(event_buf) is equal to 1 {
+            let event_type: Int be readInt(event_buf)
+
+            // SDL_EVENT_QUIT = 256
+            if event_type is equal to 256 then {
+                running be 0
+            }
+
+            // SDL_EVENT_KEY_DOWN = 768
+            if event_type is equal to 768 then {
+                let key_code: Int be readInt(offsetPointer(event_buf, 28))
+
+                // 'a' (97) or Left Arrow (1073741904) -> Manual Left Rotation
+                if key_code is equal to 97 or key_code is equal to 1073741904 then {
+                    rot_y be rot_y subtract 0.1
+                }
+                // 'd' (100) or Right Arrow (1073741903) -> Manual Right Rotation
+                if key_code is equal to 100 or key_code is equal to 1073741903 then {
+                    rot_y be rot_y add 0.1
+                }
+                // 'w' (119) or Up Arrow (1073741906) -> Zoom In
+                if key_code is equal to 119 or key_code is equal to 1073741906 then {
+                    if cam_z is greater than 100.0 then {
+                        cam_z be cam_z subtract 15.0
+                    }
+                }
+                // 's' (115) or Down Arrow (1073741905) -> Zoom Out
+                if key_code is equal to 115 or key_code is equal to 1073741905 then {
+                    cam_z be cam_z add 15.0
+                }
+                // Spacebar (32) -> Toggle Auto-Rotate
+                if key_code is equal to 32 then {
+                    if auto_rotate is equal to 1 then {
+                        auto_rotate be 0
+                    } otherwise {
+                        auto_rotate be 1
+                    }
+                }
+            }
+        }
+    }
+
+    // Clean up persistent heap memory
+    free(event_buf)
+    free(framebuffer)
+    SDL_Quit()
+
+    printnl "3D Engine shut down cleanly."
+    return 0
+}
