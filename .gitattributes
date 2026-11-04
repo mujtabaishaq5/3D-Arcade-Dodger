@@ -1,0 +1,5 @@
+# Force GitHub to classify your extension as your custom language name
+*.elpl linguist-language=ELPL
+
+# Alternatively, you can explicitly hide specific folders from the language statistics bar completely:
+src/build_helpers/* linguist-vendored=true
