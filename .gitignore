@@ -15,11 +15,13 @@
 *.jar
 *.c
 *.asm
+
 # === Third-Party Dependencies ===
-/SDL3.xcframework/
-/SDL3_image.xcframework/
-/SDL3_mixer.xcframework/
-/SDL3_ttf.xcframework/
+SDL3.xcframework/
+SDL3_image.xcframework/
+SDL3_mixer.xcframework/
+SDL3_ttf.xcframework/
+
 
 # === Assets (Binaries & Media) ===
 *.mp3
